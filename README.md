@@ -1,4 +1,5 @@
 # Cisco IOS-XE / IOS-SE Security Configuration Auditor
+<img width="1740" height="922" alt="image" src="https://github.com/user-attachments/assets/4b3c5f2e-eb98-4603-b359-c89b0700b305" />
 
 A zero-dependency, single-file Python auditor that ingests a manually-exported Cisco `show running-config` text file and produces a scored, categorized, actionable security audit — with copy-paste-ready remediation commands for every finding it can fix, and honest `MANUAL_REVIEW` flags for the things it structurally can't see from a config file alone.
 

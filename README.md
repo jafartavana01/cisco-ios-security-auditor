@@ -9,6 +9,8 @@ Built by [Jafar Tavana](https://github.com/jafartavana01) — network security e
 python cisco_audit.py -c running.conf --all
 ```
 
+> **What's new:** `--compliance` now cross-references every finding against NIST SP 800-53, ISO/IEC 27002:2022, the CIS Cisco IOS-XE Benchmark, and DISA STIG — with zero changes to the existing ~160 checks. See [Compliance Framework Mapping](#compliance-framework-mapping) and the [Changelog](#changelog) for full detail.
+
 ---
 
 ## Table of Contents
@@ -23,11 +25,13 @@ python cisco_audit.py -c running.conf --all
 8. [Understanding the Output](#understanding-the-output)
 9. [The Correlation Engine](#the-correlation-engine)
 10. [Policy Customization](#policy-customization)
-11. [Extending the Tool: Adding a New Domain Check](#extending-the-tool-adding-a-new-domain-check)
-12. [Known Limitations & Roadmap](#known-limitations--roadmap)
-13. [FAQ](#faq)
-14. [Contributing](#contributing)
-15. [License & Disclaimer](#license--disclaimer)
+11. [Compliance Framework Mapping](#compliance-framework-mapping)
+12. [Extending the Tool: Adding a New Domain Check](#extending-the-tool-adding-a-new-domain-check)
+13. [Known Limitations & Roadmap](#known-limitations--roadmap)
+14. [FAQ](#faq)
+15. [Contributing](#contributing)
+16. [Changelog](#changelog)
+17. [License & Disclaimer](#license--disclaimer)
 
 ---
 
@@ -266,6 +270,7 @@ python cisco_audit.py -c running.conf --all --exit-on-critical
 | `--format <text,json>` | Comma-separated. Default: `text` |
 | `--min-severity <level>` | `critical\|high\|medium\|low\|info`. Filters what's shown. Default: `info` (everything) |
 | `--policy <file.json>` | Override built-in thresholds (see [Policy Customization](#policy-customization)) |
+| `--compliance` | Also generate compliance cross-reference reports (NIST 800-53, ISO 27002, CIS Benchmark, DISA STIG — see [Compliance Framework Mapping](#compliance-framework-mapping)) |
 | `--exit-on-critical` | Exit code `2` if any unresolved CRITICAL finding exists — for pipeline/CI gating |
 | `-v, --verbose` | Show PASS/N-A findings too, plus uncapped evidence lists everywhere |
 
@@ -458,6 +463,59 @@ One rule (802.1X + MAB) is intentionally **not** implemented yet, because the 80
 
 ---
 
+## Compliance Framework Mapping
+
+`--compliance` cross-references every finding against four external frameworks. This is entirely optional and additive — nothing else about the audit changes, and without the flag no compliance files are produced at all.
+
+```bash
+python cisco_audit.py -c running.conf --all --compliance
+```
+
+Produces:
+- `sections/compliance_nist_800_53.txt`, `compliance_iso27002.txt`, `compliance_cis_benchmark.txt`, `compliance_disa_stig.txt` — one file per framework, findings grouped **by control number** (the way you'd actually navigate the framework document itself), not by domain.
+- `compliance_overview.txt` — a single cross-framework matrix of FAILED findings only, all four frameworks side by side, sorted by severity.
+
+### Architecture
+
+The mapping data lives entirely outside the check functions, in standalone JSON files under `mappings/`:
+
+```json
+{
+  "framework_id": "iso27002",
+  "framework_name": "ISO/IEC 27002:2022",
+  "license_note": "...",
+  "checks": {
+    "L2PS-01": [{"control": "8.20", "title": "Networks security", "relationship": "direct"}],
+    "DHCPSNOOP-01": [
+      {"control": "8.20", "title": "Networks security", "relationship": "direct"}
+    ]
+  }
+}
+```
+
+`load_compliance_mappings()` loads whatever mapping files exist in `mappings/` and cross-references them against `check_id` at report-generation time — **none of the ~160 check functions were touched to add this feature**. That was a deliberate design choice: it means adding a 5th framework later is "drop in another JSON file," not a re-edit of every check. `tools/generate_mappings.py` is the (non-runtime) generator script used to build the shipped JSON files — kept in the repo so the mapping can be regenerated or extended without hand-editing JSON.
+
+Each mapped control carries a **relationship** tag:
+- `direct` — the check is essentially the technical implementation of that control.
+- `supporting` — the check contributes evidence toward the control but doesn't fully satisfy it alone (most controls in People/Organizational/Physical-adjacent themes need policy or procedural evidence this tool can't see).
+
+### Honest scope per framework — this is not evenly populated, on purpose
+
+| Framework | Status | Why |
+|---|---|---|
+| **NIST SP 800-53 Rev. 5** | Substantially populated | Public domain (U.S. government work) — no copyright constraint on quoting control IDs/titles, and the control catalog is stable and well-documented. |
+| **ISO/IEC 27002:2022** | Substantially populated | Structure (93 controls, 4 themes, clause 8 = Technological) is well-documented; only control **numbers and short conventional titles** are referenced — never the descriptive/guidance text, which is ISO's copyrighted, commercially-sold content. Only ~34 of 93 controls (clause 8) are even theoretically reachable from a config file — the rest are Organizational/People/Physical controls no device config can speak to. |
+| **CIS Cisco IOS-XE 17.x Benchmark v2.1.0** | Minimally populated (2 entries) | Only entries directly confirmed against real benchmark text are included. The full PDF is gated behind a CIS SecureSuite login, and section numbering differs across benchmark versions (15 / 16 / 17.x) — guessing was not an option here. |
+| **DISA STIG — Cisco IOS-XE Switch (NDM/L2S/RTR)** | Empty (architecture only) | The STIG package and its general structure (~42 NDM requirements, currently at v3r5) are confirmed, but no specific V-ID could be verified without DoD Cyber Exchange/CAC access. Ships ready to populate the moment someone with access can supply the actual checklist text. |
+
+This is the same honesty pattern the tool already applies to `MANUAL_REVIEW` findings: a confident-looking wrong control number is worse than an explicit "not yet mapped." If you have access to the current CIS Benchmark PDF or a DISA STIG checklist export, contributions to `mappings/cis_ios_xe_benchmark.json` / `mappings/disa_stig_cisco_iosxe.json` are very welcome.
+
+### Standard disclaimer (repeated in every generated compliance file)
+
+> This is a practitioner-built cross-reference, not an official statement of compliance or a certified mapping. Verify against the current published framework document before using this as audit evidence.
+
+---
+
 ## Policy Customization
 
 Thresholds (port-security max-hosts, DHCP-snooping rate-limit range, SSH timeout ceilings, weak-secret wordlists, etc.) live in one dict and can be overridden without touching the script:
@@ -540,7 +598,7 @@ All of the above are reported as `MANUAL_REVIEW` with the specific live command 
 - 802.1X / MAB / TrustSec domain
 - Wireless (WLC) domain
 - MACsec domain
-- Compliance-framework mapping (CIS Benchmark / DISA STIG / Cisco SAFE cross-reference)
+- Compliance-framework mapping is now built (see [Compliance Framework Mapping](#compliance-framework-mapping)) — NIST 800-53 and ISO 27002 are substantially populated; CIS Benchmark and DISA STIG are architecture-only pending verified access to their gated source documents; Cisco SAFE is not planned as a mapping target (it's an architecture framework, not a control catalog)
 - Configuration-hygiene domain (unused route-maps/prefix-lists/object-groups/VRFs — distinct from the security-severity ACL-unused check that already exists)
 - IOS-XE version → Cisco PSIRT/CVE cross-reference (the version is already extracted; the lookup against a CVE feed is the missing piece)
 - HTML report format (currently `text` and `json` only)
@@ -571,6 +629,31 @@ Works fine — the tool uses `pathlib.Path` throughout, so `-o C:\audits\core-sw
 ## Contributing
 
 Issues and PRs welcome — especially for the roadmap items above. If you're adding a domain, please follow the existing pattern (`Finding` objects with `evidence_label` + `fix_command` populated wherever a concrete remediation exists, `MANUAL_REVIEW` rather than a guess wherever it doesn't) so the report style stays consistent across the whole tool.
+
+---
+
+## Changelog
+
+### v1.1 — Compliance Framework Mapping
+- **New `--compliance` flag.** When set, every finding is cross-referenced against four frameworks: **NIST SP 800-53 Rev. 5**, **ISO/IEC 27002:2022**, the **CIS Cisco IOS-XE Benchmark**, and **DISA STIG (Cisco IOS-XE Switch)**.
+- **Architecture:** the mapping lives entirely outside the check functions — one JSON file per framework in `mappings/`, keyed by `check_id`. This means the existing ~160 checks in `cisco_audit.py` were **not touched at all** to add this feature; the mapping is loaded and cross-referenced at report-generation time only. Adding a fifth framework later is "add a JSON file," not "edit 160 function calls."
+- **Two new report views**, matching the two most useful ways to actually use a compliance mapping:
+  - `sections/compliance_<framework>.txt` — one file per framework, findings grouped by control number, for anyone doing a deep-dive against one specific standard during an audit.
+  - `compliance_overview.txt` — a single cross-framework matrix of every FAILED finding with its severity and control reference in each framework side-by-side, for a fast management-facing view.
+- **Every mapped control carries a `relationship` tag** — `direct` (the check is essentially the technical implementation of that control) or `supporting` (contributes to, but doesn't fully satisfy, an organizational-level control on its own). This avoids the tool overclaiming compliance from a single technical config check.
+- **Honest, uneven coverage by design, not oversight:**
+  - NIST SP 800-53 and ISO/IEC 27002:2022 are substantially populated (180 check IDs each) — both are stable, well-documented, and (for NIST) public domain, so these could be built with real confidence.
+  - The CIS Cisco IOS-XE Benchmark mapping ships with only the handful of entries directly verified against the actual v2.1.0 document; the rest are intentionally left unmapped rather than guessed, since CIS section numbering differs across benchmark versions and the full PDF requires a CIS SecureSuite login.
+  - The DISA STIG mapping ships as an empty, ready-to-populate scaffold — the STIG package (NDM/L2S/RTR sub-STIGs, currently v3r5) was confirmed to exist, but no specific V-ID could be verified without DoD Cyber Exchange access. Same principle as the tool's `MANUAL_REVIEW` status elsewhere: don't fabricate a number that looks authoritative but might be wrong.
+  - See `tools/generate_mappings.py` for the full reasoning behind every mapped (and deliberately unmapped) control — it's kept in-repo specifically so the mapping can be extended by editing that script rather than hand-writing JSON.
+- **No breaking changes.** `--compliance` is fully opt-in; running the tool without it produces byte-identical behavior to v1.0.
+
+### v1.0 — Initial Release
+- 9 audit domains, ~160 checks: Management Plane, Layer 2, Layer 3, Control Plane (CoPP), IPsec VPN, Zone-Based Firewall, Cryptography & PKI, Physical Security & Boot, Unnecessary Services & Misc.
+- 10-rule correlation engine reasoning across domain findings.
+- `fix_command` generation for actionable, copy-paste-ready remediation on the majority of checks.
+- Four example configs covering different device roles (access switch, core/distribution switch, edge router with IPsec VPN, hardened reference config).
+- Text and JSON report formats, per-domain output files, weighted scoring.
 
 ---
 

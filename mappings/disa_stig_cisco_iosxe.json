@@ -1,0 +1,6 @@
+{
+  "framework_id": "disa_stig",
+  "framework_name": "DISA STIG -- Cisco IOS-XE Switch (NDM/L2S/RTR)",
+  "license_note": "Public domain (U.S. DoD work). Mapping intentionally unpopulated pending verified access to the current STIG checklist text -- see comments in generate_mappings.py for scope.",
+  "checks": {}
+}

@@ -2581,6 +2581,158 @@ def write_json(path: Path, cfg: CiscoConfig, all_findings: list[Finding], args) 
 
 
 # =============================================================================
+# 16b. COMPLIANCE FRAMEWORK MAPPING
+# =============================================================================
+# Design note: this deliberately does NOT touch the ~160 check functions above.
+# Mapping data lives in standalone JSON files under mappings/, keyed only by
+# check_id, and is cross-referenced at report-generation time. This keeps the
+# check logic and the compliance mapping independently maintainable -- someone
+# can improve/extend a mapping file without touching a line of check code, and
+# adding a 5th framework later is "drop in another JSON file," not a rewrite.
+#
+# IMPORTANT SCOPE NOTE: not every framework below is populated to the same
+# depth, and that's intentional rather than an oversight:
+#   - NIST SP 800-53 Rev. 5 and ISO/IEC 27002:2022 are populated with a
+#     substantial, deliberately-reasoned mapping across most checks.
+#   - The CIS Cisco IOS-XE Benchmark mapping only contains entries that were
+#     directly verified against real benchmark text; everything else is
+#     left unmapped rather than guessed, since CIS numbering differs across
+#     benchmark versions and the full document is gated behind a CIS
+#     SecureSuite login.
+#   - The DISA STIG mapping ships empty (architecture only) pending
+#     verified access to the current STIG checklist text.
+# See mappings/*.json "license_note" fields and tools/generate_mappings.py
+# for the reasoning behind each framework's scope.
+
+COMPLIANCE_FRAMEWORKS = [
+    ("nist_800_53_rev5.json", "compliance_nist_800_53.txt"),
+    ("iso27002_2022.json", "compliance_iso27002.txt"),
+    ("cis_ios_xe_benchmark.json", "compliance_cis_benchmark.txt"),
+    ("disa_stig_cisco_iosxe.json", "compliance_disa_stig.txt"),
+]
+
+
+def load_compliance_mappings(mappings_dir: Path) -> list[dict]:
+    """Load every available framework mapping file. Missing files are skipped
+    silently (compliance mapping is an optional bonus feature, not a hard
+    dependency of the core audit)."""
+    loaded = []
+    for filename, _outfile in COMPLIANCE_FRAMEWORKS:
+        path = mappings_dir / filename
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["_report_filename"] = _outfile
+            loaded.append(data)
+        except Exception as exc:  # noqa: BLE001 -- surfaced, doesn't abort the audit
+            print(f"[!] Warning: could not load compliance mapping '{path}': {exc}", file=sys.stderr)
+    return loaded
+
+
+def write_compliance_framework_file(path: Path, framework: dict, all_findings: list[Finding]) -> None:
+    """Example 2 from the design discussion: one file per framework, grouped
+    by control number (not by domain) -- mirrors how someone auditing against
+    a specific standard actually navigates that standard's document."""
+    checks_map: dict = framework.get("checks", {})
+    findings_by_id: dict[str, Finding] = {f.check_id: f for f in all_findings}
+
+    # Group by control number
+    by_control: dict[str, list] = {}
+    for check_id, entries in checks_map.items():
+        finding = findings_by_id.get(check_id)
+        if finding is None:
+            continue  # mapped check wasn't part of this run's selected domains
+        for entry in entries:
+            by_control.setdefault(entry["control"], []).append((entry, finding))
+
+    total_possible = "93" if framework["framework_id"] == "iso27002" else \
+                      "~1,000 (network-relevant subset far smaller)" if framework["framework_id"] == "nist_800_53" else \
+                      "unknown / version-dependent"
+
+    lines = [
+        "=" * 80,
+        f"{framework['framework_name']} -- Cross-Reference",
+        "=" * 80,
+        framework.get("license_note", ""),
+        "",
+        "This is a practitioner-built cross-reference, not an official statement of",
+        "compliance or a certified mapping. Verify against the current published",
+        "framework document before using this as audit evidence.",
+        "",
+        f"Coverage: {len(by_control)} control(s) referenced by this tool's checks "
+        f"(out of {total_possible} total in the framework). The remainder require "
+        f"evidence outside the scope of a device configuration file (policy, "
+        f"process, physical, or organizational controls).",
+        "",
+    ]
+
+    if not by_control:
+        lines.append("No mapped controls matched findings from the domains run in this audit.")
+    else:
+        for control in sorted(by_control.keys()):
+            pairs = by_control[control]
+            title = pairs[0][0].get("title", "")
+            lines.append("-" * 80)
+            lines.append(f"{control}  {title}")
+            lines.append("-" * 80)
+            for entry, finding in sorted(pairs, key=lambda p: p[1].check_id):
+                rel = entry.get("relationship", "direct")
+                lines.append(f"  [{STATUS_TAG[finding.status]}] {finding.check_id:<16} {finding.title}  ({rel})")
+            lines.append("")
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_compliance_overview(path: Path, frameworks: list[dict], all_findings: list[Finding]) -> None:
+    """Example 3 from the design discussion: single cross-framework matrix,
+    FAILED findings only, sorted by severity -- the default at-a-glance view."""
+    findings_by_id: dict[str, Finding] = {f.check_id: f for f in all_findings}
+    failed = [f for f in all_findings if f.status == Status.FAIL]
+    failed.sort(key=lambda f: SEVERITY_RANK[f.severity])
+
+    framework_names = [fw["framework_name"] for fw in frameworks]
+    lines = [
+        "=" * 80,
+        "Cross-Framework Compliance Overview -- FAILED findings only",
+        "=" * 80,
+        f"Frameworks: {' | '.join(framework_names)}",
+        "",
+        "This is a practitioner-built cross-reference, not an official statement of",
+        "compliance for any framework. Verify against the current published",
+        "benchmark/STIG/control-catalog documents before using as audit evidence.",
+        "",
+    ]
+
+    if not failed:
+        lines.append("No failed findings in this run.")
+    else:
+        id_width = max(14, max((len(f.check_id) for f in failed), default=14) + 2)
+        header = f"{'Check ID':<{id_width}}{'Severity':<10}{'Title':<42}"
+        for fw in frameworks:
+            header += f"{fw['framework_id']:<14}"
+        lines.append(header)
+        lines.append("-" * len(header))
+        for finding in failed:
+            title_col = (finding.title[:38] + "..") if len(finding.title) > 40 else finding.title
+            row = f"{finding.check_id:<{id_width}}{finding.severity.value.upper():<10}{title_col:<42}"
+            for fw in frameworks:
+                entries = fw.get("checks", {}).get(finding.check_id, [])
+                cell = "/".join(e["control"] for e in entries) if entries else "-"
+                row += f"{cell:<14}"
+            lines.append(row)
+
+        lines.append("")
+        lines.append("-" * 80)
+        lines.append("Coverage summary by framework (controls with >=1 mapped check):")
+        for fw in frameworks:
+            n_controls = len({e["control"] for entries in fw.get("checks", {}).values() for e in entries})
+            lines.append(f"  {fw['framework_name']:<45} {n_controls} control(s) mapped")
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+# =============================================================================
 # 17. FILE I/O HELPERS (Windows-friendly encoding handling)
 # =============================================================================
 
@@ -2632,6 +2784,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-severity", choices=["critical", "high", "medium", "low", "info"], default="info",
                     help="Only include findings at or above this severity in the report (default: info = all)")
     p.add_argument("--policy", type=Path, default=None, help="Optional JSON file overriding default thresholds")
+    p.add_argument("--compliance", action="store_true",
+                    help="Also generate compliance cross-reference reports (NIST 800-53, ISO 27002, "
+                         "CIS Benchmark, DISA STIG -- coverage varies per framework, see README) "
+                         "under sections/compliance_*.txt plus an overview matrix")
     p.add_argument("--exit-on-critical", action="store_true",
                     help="Exit with code 2 if any unresolved CRITICAL finding exists (useful for CI/pipelines)")
     p.add_argument("-v", "--verbose", action="store_true",
@@ -2720,6 +2876,19 @@ def main() -> int:
     if "json" in formats:
         write_json(outdir / "findings.json", cfg, all_findings, args)
         print(f"JSON report written to:  {outdir / 'findings.json'}")
+
+    if args.compliance:
+        mappings_dir = Path(__file__).resolve().parent / "mappings"
+        frameworks = load_compliance_mappings(mappings_dir)
+        if not frameworks:
+            print(f"\n[!] --compliance requested but no mapping files found under {mappings_dir}",
+                  file=sys.stderr)
+        else:
+            for fw in frameworks:
+                write_compliance_framework_file(sections_dir / fw["_report_filename"], fw, all_findings)
+            write_compliance_overview(outdir / "compliance_overview.txt", frameworks, all_findings)
+            print(f"Compliance cross-reference written to: {outdir / 'compliance_overview.txt'} "
+                  f"(+ per-framework files in {sections_dir})")
 
     if args.exit_on_critical:
         unresolved_critical = any(f.status == Status.FAIL and f.severity == Severity.CRITICAL for f in all_findings)

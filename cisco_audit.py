@@ -2775,7 +2775,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
                "  python cisco_audit.py -c running.conf --all --format text,json --min-severity high\n",
     )
     p.add_argument("-c", "--config", required=True, type=Path, help="Path to the running-config text export")
-    p.add_argument("--all", action="store_true", help="Run every domain (default if no domain flag is given)")
+    p.add_argument("--all", action="store_true",
+                    help="Run every domain (default if no domain flag is given). Also implies --compliance.")
     for key in DOMAIN_ORDER:
         p.add_argument(f"--{key}", action="store_true", help=DOMAIN_FLAG_HELP[key])
     p.add_argument("-o", "--outdir", type=Path, default=None,
@@ -2785,9 +2786,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
                     help="Only include findings at or above this severity in the report (default: info = all)")
     p.add_argument("--policy", type=Path, default=None, help="Optional JSON file overriding default thresholds")
     p.add_argument("--compliance", action="store_true",
-                    help="Also generate compliance cross-reference reports (NIST 800-53, ISO 27002, "
+                    help="Generate compliance cross-reference reports (NIST 800-53, ISO 27002, "
                          "CIS Benchmark, DISA STIG -- coverage varies per framework, see README) "
-                         "under sections/compliance_*.txt plus an overview matrix")
+                         "under sections/compliance_*.txt plus an overview matrix. Automatically "
+                         "enabled by --all; use this flag standalone to get it on a partial-domain run.")
     p.add_argument("--exit-on-critical", action="store_true",
                     help="Exit with code 2 if any unresolved CRITICAL finding exists (useful for CI/pipelines)")
     p.add_argument("-v", "--verbose", action="store_true",
@@ -2826,6 +2828,15 @@ def main() -> int:
     cfg = CiscoConfig(raw)
     policy = load_policy(args.policy)
     domains_to_run = determine_domains(args)
+
+    # Running every domain implies a compliance cross-reference is wanted too --
+    # whether "--all" was passed explicitly or is the implicit default (no domain
+    # flag given at all). --compliance still works standalone for partial-domain
+    # runs (e.g. "--l2 --compliance"); this only auto-enables it for the full run.
+    ran_every_domain = domains_to_run == DOMAIN_ORDER
+    if ran_every_domain and not args.compliance:
+        args.compliance = True
+        print("(--all implies --compliance -- add sections/compliance_*.txt + compliance_overview.txt)")
 
     outdir = args.outdir or Path(f"audit_{cfg.get_hostname()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
     sections_dir = outdir / "sections"

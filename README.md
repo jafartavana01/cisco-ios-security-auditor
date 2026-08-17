@@ -256,7 +256,7 @@ python cisco_audit.py -c running.conf --all --exit-on-critical
 | Flag | Description |
 |---|---|
 | `-c, --config <file>` | **Required.** Path to the running-config text export. |
-| `--all` | Run every domain. Default behavior if no domain flag is passed at all. |
+| `--all` | Run every domain. Default behavior if no domain flag is passed at all. Also automatically enables `--compliance`. |
 | `--mgmt` | Management plane (AAA, SSH, HTTP, SNMP, NTP, logging, banners, DNS, exposure matrix, passwords) |
 | `--l2` | Layer 2 (port security, STP, UDLD, storm-control, DHCP snooping, DAI, IPSG, trunk/native VLAN, VTP) |
 | `--l3` | Layer 3 (uRPF, routing-protocol auth, FHRP auth, ICMP hardening, ACL analysis, object tracking) |
@@ -270,7 +270,7 @@ python cisco_audit.py -c running.conf --all --exit-on-critical
 | `--format <text,json>` | Comma-separated. Default: `text` |
 | `--min-severity <level>` | `critical\|high\|medium\|low\|info`. Filters what's shown. Default: `info` (everything) |
 | `--policy <file.json>` | Override built-in thresholds (see [Policy Customization](#policy-customization)) |
-| `--compliance` | Also generate compliance cross-reference reports (NIST 800-53, ISO 27002, CIS Benchmark, DISA STIG — see [Compliance Framework Mapping](#compliance-framework-mapping)) |
+| `--compliance` | Generate compliance cross-reference reports (NIST 800-53, ISO 27002, CIS Benchmark, DISA STIG — see [Compliance Framework Mapping](#compliance-framework-mapping)). Automatically enabled by `--all`; use standalone for a partial-domain run (e.g. `--l2 --compliance`). |
 | `--exit-on-critical` | Exit code `2` if any unresolved CRITICAL finding exists — for pipeline/CI gating |
 | `-v, --verbose` | Show PASS/N-A findings too, plus uncapped evidence lists everywhere |
 
@@ -465,10 +465,14 @@ One rule (802.1X + MAB) is intentionally **not** implemented yet, because the 80
 
 ## Compliance Framework Mapping
 
-`--compliance` cross-references every finding against four external frameworks. This is entirely optional and additive — nothing else about the audit changes, and without the flag no compliance files are produced at all.
+`--compliance` cross-references every finding against four external frameworks. It's automatically enabled whenever you run `--all` (explicitly or as the implicit default with no domain flag), and stays fully optional/additive on a partial-domain run — nothing else about the audit changes, and without it no compliance files are produced.
 
 ```bash
-python cisco_audit.py -c running.conf --all --compliance
+# --compliance is automatic here (running every domain)
+python cisco_audit.py -c running.conf --all
+
+# explicit flag still needed on a partial-domain run
+python cisco_audit.py -c running.conf --l2 --l3 --compliance
 ```
 
 Produces:
@@ -633,6 +637,11 @@ Issues and PRs welcome — especially for the roadmap items above. If you're add
 ---
 
 ## Changelog
+
+### v1.1.1 — `--all` implies `--compliance`
+- Running `--all` (explicitly, or implicitly by passing no domain flag at all) now automatically generates the compliance cross-reference reports too — no need to separately pass `--compliance` for a full run.
+- `--compliance` still works exactly as before as a standalone flag for partial-domain runs (e.g. `--l2 --compliance`), where it is **not** auto-enabled — the tool only assumes you want the compliance view when every domain actually ran, since a partial run's cross-reference would be incomplete by definition.
+- No other behavior change; this only affects whether the compliance files get written by default.
 
 ### v1.1 — Compliance Framework Mapping
 - **New `--compliance` flag.** When set, every finding is cross-referenced against four frameworks: **NIST SP 800-53 Rev. 5**, **ISO/IEC 27002:2022**, the **CIS Cisco IOS-XE Benchmark**, and **DISA STIG (Cisco IOS-XE Switch)**.

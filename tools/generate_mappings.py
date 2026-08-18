@@ -434,15 +434,217 @@ CIS = {
 }
 
 # =============================================================================
-# DISA STIG -- Cisco IOS-XE Switch (NDM / L2S / RTR sub-STIGs)
-# Intentionally empty. I could confirm the *package* exists (NDM sub-STIG,
-# currently at v3r5 as of March 2026, ~42 requirements) but could not verify
-# any specific V-ID against the current document, which requires DoD Cyber
-# Exchange / CAC access I don't have. Ship the loader/report support ready
-# for this framework; populate for real once someone with STIG access can
-# supply the actual checklist text.
+# DISA STIG -- Cisco IOS Switch L2S (V-IDs V-2206xx) and Cisco IOS Router RTR
+# (V-IDs V-2165xx/V-2169xx/V-2301xx), sourced from the actual current task
+# files of two open-source (MIT-licensed) Ansible remediation roles:
+#   - ansible-lockdown/CISCO-IOS-L2S-STIG (explicitly Version 2, Release 2,
+#     23 Jul 2021 per that repo's README)
+#   - ansible-lockdown/CISCO-IOS-RTR-STIG (version/date not reliably stated
+#     in that repo's own README -- it appears to be a copy/paste error
+#     referencing the L2S STIG instead; the V-21xxxx ID range is used here
+#     as the citation anchor instead of an unverifiable date)
+# Every Group ID (CISC-L2-*/CISC-RT-*), Vulnerability ID (V-*), and title
+# below was extracted directly from those repos' YAML task files, not
+# guessed or reconstructed from memory. DISA STIG content is a U.S.
+# government work (public domain) -- titles are quoted in full deliberately,
+# unlike the CIS/ISO entries where only short titles are used.
+#
+# KNOWN LIMITATION: STIG documents are revised periodically and Group/
+# Vulnerability IDs CAN change between revisions for a given requirement,
+# though V-IDs are generally more stable than the "SV-...r...rule" revision
+# suffix. Treat this mapping as a strong starting point sourced from a real,
+# specific STIG revision -- not a guarantee of exact alignment with whatever
+# is the *current* DISA-published STIG at the time you read this. Verify
+# against the live document (dl.dod.cyber.mil) before using as formal ATO
+# evidence.
 # =============================================================================
-STIG = {}
+_L2S_SRC = "DISA Cisco IOS Switch L2S STIG V2R2 (23 Jul 2021), via ansible-lockdown/CISCO-IOS-L2S-STIG"
+_RTR_SRC = "DISA Cisco IOS Router RTR STIG (V-21xxxx ID range; exact revision/date not confirmable from source repo), via ansible-lockdown/CISCO-IOS-RTR-STIG"
+
+STIG = {
+    # --- Layer 2 domain -----------------------------------------------------
+    "STP-01": [{"control": "CISC-L2-000100", "v_id": "V-220630",
+                "title": "The Cisco switch must have Bridge Protocol Data Unit (BPDU) Guard enabled on all "
+                         "user-facing or untrusted access switch ports.",
+                "relationship": "direct", "source": _L2S_SRC}],
+    "STP-02": [{"control": "CISC-L2-000090", "v_id": "V-220629",
+                "title": "The Cisco switch must have Root Guard enabled on all switch ports connecting to "
+                         "access layer switches.",
+                "relationship": "direct", "source": _L2S_SRC}],
+    "STP-03": [{"control": "CISC-L2-000110", "v_id": "V-220631",
+                "title": "The Cisco switch must have Spanning Tree Protocol (STP) Loop Guard enabled.",
+                "relationship": "direct", "source": _L2S_SRC}],
+    "STP-04": [{"control": "CISC-L2-000180", "v_id": "V-220638",
+                "title": "The Cisco switch must implement Rapid Spanning Tree Protocol (STP) where VLANs span "
+                         "multiple switches with redundant links.",
+                "relationship": "direct", "source": _L2S_SRC}],
+    "UDLD-01": [{"control": "CISC-L2-000190", "v_id": "V-220639",
+                 "title": "The Cisco switch must enable Unidirectional Link Detection (UDLD) to protect "
+                          "against one-way connections.",
+                 "relationship": "direct", "source": _L2S_SRC}],
+    "STORM-01": [{"control": "CISC-L2-000160", "v_id": "V-220636",
+                  "title": "The Cisco switch must have Storm Control configured on all host-facing switchports.",
+                  "relationship": "direct", "source": _L2S_SRC}],
+    "DHCPSNOOP-01": [{"control": "CISC-L2-000130", "v_id": "V-220633",
+                       "title": "The Cisco switch must have DHCP snooping for all user VLANs to validate DHCP "
+                                "messages from untrusted sources.",
+                       "relationship": "direct", "source": _L2S_SRC}],
+    "DHCPSNOOP-02": [{"control": "CISC-L2-000130", "v_id": "V-220633", "title": "(see DHCPSNOOP-01)",
+                       "relationship": "supporting", "source": _L2S_SRC}],
+    "DHCPSNOOP-03": [{"control": "CISC-L2-000130", "v_id": "V-220633", "title": "(see DHCPSNOOP-01)",
+                       "relationship": "supporting", "source": _L2S_SRC}],
+    "DHCPSNOOP-04": [{"control": "CISC-L2-000130", "v_id": "V-220633", "title": "(see DHCPSNOOP-01)",
+                       "relationship": "supporting", "source": _L2S_SRC}],
+    "DAI-01": [{"control": "CISC-L2-000150", "v_id": "V-220635",
+                "title": "The Cisco switch must have Dynamic Address Resolution Protocol (ARP) Inspection "
+                         "(DAI) enabled on all user VLANs.",
+                "relationship": "direct", "source": _L2S_SRC}],
+    "DAI-02": [{"control": "CISC-L2-000150", "v_id": "V-220635", "title": "(see DAI-01)",
+                "relationship": "supporting", "source": _L2S_SRC}],
+    "DAI-03": [{"control": "CISC-L2-000150", "v_id": "V-220635", "title": "(see DAI-01)",
+                "relationship": "supporting", "source": _L2S_SRC}],
+    "DAI-04": [{"control": "CISC-L2-000150", "v_id": "V-220635", "title": "(see DAI-01)",
+                "relationship": "supporting", "source": _L2S_SRC}],
+    "IPSG-01": [{"control": "CISC-L2-000140", "v_id": "V-220634",
+                 "title": "The Cisco switch must have IP Source Guard enabled on all user-facing or "
+                          "untrusted access switch ports.",
+                 "relationship": "direct", "source": _L2S_SRC}],
+    "TRUNK-01": [{"control": "CISC-L2-000260", "v_id": "V-220646",
+                  "title": "The Cisco switch must have the native VLAN assigned to an ID other than the "
+                           "default VLAN for all 802.1q trunk links.",
+                  "relationship": "direct", "source": _L2S_SRC}],
+    "TRUNK-02": [{"control": "CISC-L2-000230", "v_id": "V-220643",
+                  "title": "The Cisco switch must have the default VLAN pruned from all trunk ports that do "
+                           "not require it.",
+                  "relationship": "direct", "source": _L2S_SRC}],
+    "TRUNK-03": [{"control": "CISC-L2-000200", "v_id": "V-220640",
+                  "title": "The Cisco switch must have all trunk links enabled statically.",
+                  "relationship": "direct", "source": _L2S_SRC}],
+    "VTP-01": [{"control": "CISC-L2-000030", "v_id": "V-220624",
+                "title": "The Cisco switch must authenticate all VLAN Trunk Protocol (VTP) messages with a "
+                         "hash function using the most secured cryptographic algorithm available.",
+                "relationship": "supporting", "source": _L2S_SRC}],
+    "L2PS-01": [{"control": "CISC-L2-000080", "v_id": "V-220628",
+                 "title": "The Cisco switch must authenticate all endpoint devices before establishing any "
+                          "connection.",
+                 "relationship": "supporting", "source": _L2S_SRC,
+                 "note": "STIG rule targets 802.1X endpoint authentication specifically; port-security MAC "
+                         "limiting is a different (complementary, not equivalent) control for the same "
+                         "unauthorized-device threat -- hence 'supporting' not 'direct'."}],
+    "SVC-01": [{"control": "CISC-L2-000010", "v_id": "V-220622",
+                "title": "The Cisco switch must be configured to disable non-essential capabilities.",
+                "relationship": "direct", "source": _L2S_SRC}],
+    "SVC-02": [{"control": "CISC-L2-000010", "v_id": "V-220622", "title": "(see SVC-01)",
+                "relationship": "direct", "source": _L2S_SRC}],
+    "SVC-03": [{"control": "CISC-L2-000010", "v_id": "V-220622", "title": "(see SVC-01)",
+                "relationship": "direct", "source": _L2S_SRC}],
+    "SVC-04": [{"control": "CISC-L2-000010", "v_id": "V-220622", "title": "(see SVC-01)",
+                "relationship": "direct", "source": _L2S_SRC}],
+    "SVC-05": [{"control": "CISC-L2-000010", "v_id": "V-220622", "title": "(see SVC-01)",
+                "relationship": "direct", "source": _L2S_SRC}],
+    "SVC-09": [{"control": "CISC-RT-000370", "v_id": "V-216585",
+                "title": "The Cisco perimeter router must be configured to have Cisco Discovery Protocol "
+                         "(CDP) disabled on all external interfaces.",
+                "relationship": "supporting", "source": _RTR_SRC,
+                "note": "STIG rule is scoped to perimeter/external interfaces specifically; this check is "
+                        "broader (global CDP posture)."}],
+    "SVC-10": [{"control": "CISC-RT-000360", "v_id": "V-216584",
+                "title": "The Cisco perimeter router must be configured to have Link Layer Discovery "
+                         "Protocol (LLDP) disabled on all external interfaces.",
+                "relationship": "supporting", "source": _RTR_SRC,
+                "note": "STIG rule is scoped to perimeter/external interfaces specifically; this check is "
+                        "broader (global LLDP posture)."}],
+    "CPURISK-01": [{"control": "CISC-L2-000040", "v_id": "V-220625",
+                     "title": "The Cisco switch must manage excess bandwidth to limit the effects of "
+                              "packet-flooding types of denial-of-service (DoS) attacks.",
+                     "relationship": "supporting", "source": _L2S_SRC}],
+
+    # --- Layer 3 / routing domain --------------------------------------------
+    "RTAUTH-OSPF-01": [{"control": "CISC-RT-000020", "v_id": "V-216986",
+                         "title": "The Cisco router must be configured to implement message authentication "
+                                  "for all control plane protocols.",
+                         "relationship": "direct", "source": _RTR_SRC}],
+    "RTAUTH-EIGRP-01": [{"control": "CISC-RT-000020", "v_id": "V-216986", "title": "(see RTAUTH-OSPF-01)",
+                          "relationship": "direct", "source": _RTR_SRC}],
+    "RTAUTH-RIP-01": [{"control": "CISC-RT-000020", "v_id": "V-216986", "title": "(see RTAUTH-OSPF-01)",
+                        "relationship": "direct", "source": _RTR_SRC}],
+    "RTAUTH-BGP-01": [{"control": "CISC-RT-000050", "v_id": "V-216555",
+                        "title": "The Cisco router must be configured to authenticate all routing protocol "
+                                 "messages using NIST-validated FIPS 198-1 message authentication code "
+                                 "algorithm.",
+                        "relationship": "direct", "source": _RTR_SRC}],
+    "RTAUTH-BGP-02": [{"control": "CISC-RT-000470", "v_id": "V-216991",
+                        "title": "The Cisco BGP router must be configured to enable the Generalized TTL "
+                                 "Security Mechanism (GTSM).",
+                        "relationship": "direct", "source": _RTR_SRC}],
+    "RTAUTH-BGP-03": [{"control": "CISC-RT-000560", "v_id": "V-216604",
+                        "title": "The Cisco BGP router must be configured to use the maximum prefixes "
+                                 "feature to protect against route table flooding and prefix "
+                                 "de-aggregation attacks.",
+                        "relationship": "direct", "source": _RTR_SRC}],
+    "URPF-01": [{"control": "CISC-RT-000740", "v_id": "V-216617",
+                 "title": "The Cisco PE router must be configured with Unicast Reverse Path Forwarding "
+                          "(uRPF) loose mode enabled on all CE-facing interfaces.",
+                 "relationship": "supporting", "source": _RTR_SRC,
+                 "note": "STIG rule is specifically scoped to MPLS PE/CE-facing interfaces; this check "
+                         "applies uRPF more generally."}],
+    "ICMP-01": [{"control": "CISC-RT-000190", "v_id": "V-216567",
+                 "title": "The Cisco router must be configured to have Internet Control Message Protocol "
+                          "(ICMP) redirect messages disabled on all external interfaces.",
+                 "relationship": "direct", "source": _RTR_SRC}],
+    "ICMP-02": [{"control": "CISC-RT-000380", "v_id": "V-216586",
+                 "title": "The Cisco perimeter router must be configured to have Proxy ARP disabled on all "
+                          "external interfaces.",
+                 "relationship": "direct", "source": _RTR_SRC}],
+    "ICMP-03": [{"control": "CISC-RT-000170", "v_id": "V-216565",
+                 "title": "The Cisco router must be configured to have Internet Control Message Protocol "
+                          "(ICMP) unreachable messages disabled on all external interfaces.",
+                 "relationship": "direct", "source": _RTR_SRC}],
+    "ICMP-05": [{"control": "CISC-RT-000120", "v_id": "V-216560",
+                 "title": "The Cisco router must be configured to protect against or limit the effects of "
+                          "denial-of-service (DoS) attacks by employing control plane protection.",
+                 "relationship": "supporting", "source": _RTR_SRC}],
+
+    # --- Control Plane (CoPP) domain -----------------------------------------
+    "COPP-01": [{"control": "CISC-RT-000120", "v_id": "V-216560",
+                 "title": "The Cisco router must be configured to protect against or limit the effects of "
+                          "denial-of-service (DoS) attacks by employing control plane protection.",
+                 "relationship": "direct", "source": _RTR_SRC}],
+    "COPP-CLASS-MCAST": [{"control": "CISC-RT-000790", "v_id": "V-216622",
+                           "title": "The Cisco multicast router must be configured to disable Protocol "
+                                    "Independent Multicast (PIM) on all interfaces that are not required to "
+                                    "support multicast routing.",
+                           "relationship": "supporting", "source": _RTR_SRC}],
+
+    # --- Physical Security domain --------------------------------------------
+    "PHYS-03": [{"control": "CISC-RT-000230", "v_id": "V-216571",
+                 "title": "The Cisco router must be configured to disable the auxiliary port unless it is "
+                          "connected to a secured modem providing encryption and authentication.",
+                 "relationship": "direct", "source": _RTR_SRC}],
+
+    # --- Misc domain -----------------------------------------------------------
+    "MISC-02": [{"control": "CISC-RT-000790", "v_id": "V-216622", "title": "(see COPP-CLASS-MCAST)",
+                 "relationship": "supporting", "source": _RTR_SRC}],
+}
+
+
+def _normalize_placeholder_titles(mapping: dict) -> None:
+    """Replace '(see X)' placeholder titles with the real title from whichever
+    entry for that control number actually has one -- keeps the raw JSON
+    self-explanatory for anyone reading it directly, not just the tool's
+    report generator (which only reads the first entry per control anyway)."""
+    real_title_by_control: dict[str, str] = {}
+    for entries in mapping.values():
+        for e in entries:
+            if e.get("title") and not e["title"].startswith("(see "):
+                real_title_by_control.setdefault(e["control"], e["title"])
+    for entries in mapping.values():
+        for e in entries:
+            if e.get("title", "").startswith("(see "):
+                e["title"] = real_title_by_control.get(e["control"], e["title"])
+
+
+_normalize_placeholder_titles(STIG)
 
 
 def write_mapping(filename: str, framework_meta: dict, checks: dict):
@@ -476,10 +678,16 @@ write_mapping("cis_ios_xe_benchmark.json", {
 
 write_mapping("disa_stig_cisco_iosxe.json", {
     "framework_id": "disa_stig",
-    "framework_name": "DISA STIG -- Cisco IOS-XE Switch (NDM/L2S/RTR)",
-    "license_note": "Public domain (U.S. DoD work). Mapping intentionally unpopulated pending "
-                     "verified access to the current STIG checklist text -- see comments in "
-                     "generate_mappings.py for scope.",
+    "framework_name": "DISA STIG -- Cisco IOS Switch L2S / Router RTR",
+    "license_note": "Public domain (U.S. DoD work). Group IDs, Vulnerability IDs (V-*), and titles below "
+                     "were extracted directly from two open-source Ansible remediation roles' current task "
+                     "files (ansible-lockdown/CISCO-IOS-L2S-STIG and CISCO-IOS-RTR-STIG), not reconstructed "
+                     "from memory. L2S is confirmed as V2R2 (23 Jul 2021); RTR's exact revision/date could "
+                     "not be confirmed from that repo's own documentation (see comments in "
+                     "generate_mappings.py). STIG IDs can shift between revisions -- verify against the "
+                     "current DISA-published document (dl.dod.cyber.mil) before using as formal ATO "
+                     "evidence. NDM (management-plane) sub-STIG remains unmapped -- no equivalent "
+                     "open-source role was found for it.",
 }, STIG)
 
 print("\nDone.")

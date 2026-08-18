@@ -2673,12 +2673,16 @@ def write_compliance_framework_file(path: Path, framework: dict, all_findings: l
         for control in sorted(by_control.keys()):
             pairs = by_control[control]
             title = pairs[0][0].get("title", "")
+            v_id = pairs[0][0].get("v_id")
+            header = f"{control}  ({v_id})  {title}" if v_id else f"{control}  {title}"
             lines.append("-" * 80)
-            lines.append(f"{control}  {title}")
+            lines.append(header)
             lines.append("-" * 80)
             for entry, finding in sorted(pairs, key=lambda p: p[1].check_id):
                 rel = entry.get("relationship", "direct")
                 lines.append(f"  [{STATUS_TAG[finding.status]}] {finding.check_id:<16} {finding.title}  ({rel})")
+                if entry.get("note"):
+                    lines.append(f"      note: {entry['note']}")
             lines.append("")
 
     path.write_text("\n".join(lines), encoding="utf-8")

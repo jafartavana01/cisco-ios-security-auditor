@@ -510,9 +510,9 @@ Each mapped control carries a **relationship** tag:
 | **NIST SP 800-53 Rev. 5** | Substantially populated | Public domain (U.S. government work) — no copyright constraint on quoting control IDs/titles, and the control catalog is stable and well-documented. |
 | **ISO/IEC 27002:2022** | Substantially populated | Structure (93 controls, 4 themes, clause 8 = Technological) is well-documented; only control **numbers and short conventional titles** are referenced — never the descriptive/guidance text, which is ISO's copyrighted, commercially-sold content. Only ~34 of 93 controls (clause 8) are even theoretically reachable from a config file — the rest are Organizational/People/Physical controls no device config can speak to. |
 | **CIS Cisco IOS-XE 17.x Benchmark v2.1.0** | Minimally populated (2 entries) | Only entries directly confirmed against real benchmark text are included. The full PDF is gated behind a CIS SecureSuite login, and section numbering differs across benchmark versions (15 / 16 / 17.x) — guessing was not an option here. |
-| **DISA STIG — Cisco IOS-XE Switch (NDM/L2S/RTR)** | Empty (architecture only) | The STIG package and its general structure (~42 NDM requirements, currently at v3r5) are confirmed, but no specific V-ID could be verified without DoD Cyber Exchange/CAC access. Ships ready to populate the moment someone with access can supply the actual checklist text. |
+| **DISA STIG — Cisco IOS Switch L2S / Router RTR** | Populated (43 entries) | Sourced from two open-source, MIT-licensed Ansible remediation roles (`ansible-lockdown/CISCO-IOS-L2S-STIG` and `CISCO-IOS-RTR-STIG`) whose current task files contain the actual Group ID, Vulnerability ID (V-*), and full requirement title for each check — extracted directly, not reconstructed from memory. L2S is confirmed as V2R2 (23 Jul 2021); the RTR repo's own README has what appears to be a copy/paste error misnaming its STIG source, so its exact revision/date isn't independently confirmable — the V-21xxxx ID range is cited instead. **STIG documents are revised periodically and IDs can shift between revisions** — treat this as a strong, real starting point, not a guarantee of exact alignment with whatever is the *current* DISA-published STIG when you read this. The NDM (management-plane) sub-STIG remains unmapped — no equivalent open-source role was found for it. |
 
-This is the same honesty pattern the tool already applies to `MANUAL_REVIEW` findings: a confident-looking wrong control number is worse than an explicit "not yet mapped." If you have access to the current CIS Benchmark PDF or a DISA STIG checklist export, contributions to `mappings/cis_ios_xe_benchmark.json` / `mappings/disa_stig_cisco_iosxe.json` are very welcome.
+This is the same honesty pattern the tool already applies to `MANUAL_REVIEW` findings: a confident-looking wrong control number is worse than an explicit "not yet mapped." If you have access to the current CIS Benchmark PDF, the current DISA NDM STIG, or can confirm the RTR STIG's actual revision, contributions to `mappings/cis_ios_xe_benchmark.json` / `mappings/disa_stig_cisco_iosxe.json` are very welcome.
 
 ### Standard disclaimer (repeated in every generated compliance file)
 
@@ -602,7 +602,7 @@ All of the above are reported as `MANUAL_REVIEW` with the specific live command 
 - 802.1X / MAB / TrustSec domain
 - Wireless (WLC) domain
 - MACsec domain
-- Compliance-framework mapping is now built (see [Compliance Framework Mapping](#compliance-framework-mapping)) — NIST 800-53 and ISO 27002 are substantially populated; CIS Benchmark and DISA STIG are architecture-only pending verified access to their gated source documents; Cisco SAFE is not planned as a mapping target (it's an architecture framework, not a control catalog)
+- Compliance-framework mapping is now built (see [Compliance Framework Mapping](#compliance-framework-mapping)) — NIST 800-53, ISO 27002, and DISA STIG (L2S/RTR) are substantially populated; the CIS Benchmark remains minimal pending gated-document access; Cisco SAFE is not planned as a mapping target (it's an architecture framework, not a control catalog)
 - Configuration-hygiene domain (unused route-maps/prefix-lists/object-groups/VRFs — distinct from the security-severity ACL-unused check that already exists)
 - IOS-XE version → Cisco PSIRT/CVE cross-reference (the version is already extracted; the lookup against a CVE feed is the missing piece)
 - HTML report format (currently `text` and `json` only)
@@ -638,6 +638,13 @@ Issues and PRs welcome — especially for the roadmap items above. If you're add
 
 ## Changelog
 
+### v1.1.2 — Real DISA STIG mapping (43 checks, up from 0)
+- The DISA STIG mapping shipped empty in v1.1 because no specific V-ID could be confidently verified. Found a legitimate public source afterward: two open-source, MIT-licensed Ansible remediation roles (`ansible-lockdown/CISCO-IOS-L2S-STIG` and `CISCO-IOS-RTR-STIG`) whose current task YAML files contain the real Group ID, Vulnerability ID (`V-*`), CCI reference, severity category, and full requirement title for each STIG check — extracted directly from that source, not reconstructed from memory.
+- **43 check IDs now map to real STIG requirements** across Layer 2 (port security/STP/DHCP snooping/DAI/IP Source Guard/trunk hygiene — direct 1:1 matches with the L2S sub-STIG), Layer 3/routing (protocol authentication, BGP TTL security, BGP max-prefix, ICMP hardening — direct matches with the RTR sub-STIG), CoPP, and physical security (AUX port).
+- Every mapped entry carries the real title (DISA STIG text is U.S. government public domain, so full titles are quoted rather than paraphrased — unlike the ISO/CIS entries, which use short titles only due to copyright), plus a `v_id` field and a `note` field explaining any scope mismatch where the relationship is `supporting` rather than `direct` (e.g. STIG's CDP/LLDP rules are scoped to perimeter/external interfaces specifically, while this tool's checks are broader).
+- **Same honesty caveat still applies, explicitly documented in the mapping file itself:** the L2S source is confirmed as STIG V2R2 (23 Jul 2021); the RTR source repo's own README appears to misname its STIG basis, so its exact revision/date could not be independently confirmed. STIG Group/Vulnerability IDs can shift between revisions. This is a strong, real starting point sourced from an actual document — not a guarantee of exact alignment with whatever DISA has currently published. The NDM (management-plane) sub-STIG remains unmapped; no equivalent open-source role was found for it.
+- No changes to check logic or CLI behavior — mapping-data-only release.
+
 ### v1.1.1 — `--all` implies `--compliance`
 - Running `--all` (explicitly, or implicitly by passing no domain flag at all) now automatically generates the compliance cross-reference reports too — no need to separately pass `--compliance` for a full run.
 - `--compliance` still works exactly as before as a standalone flag for partial-domain runs (e.g. `--l2 --compliance`), where it is **not** auto-enabled — the tool only assumes you want the compliance view when every domain actually ran, since a partial run's cross-reference would be incomplete by definition.
@@ -653,7 +660,7 @@ Issues and PRs welcome — especially for the roadmap items above. If you're add
 - **Honest, uneven coverage by design, not oversight:**
   - NIST SP 800-53 and ISO/IEC 27002:2022 are substantially populated (180 check IDs each) — both are stable, well-documented, and (for NIST) public domain, so these could be built with real confidence.
   - The CIS Cisco IOS-XE Benchmark mapping ships with only the handful of entries directly verified against the actual v2.1.0 document; the rest are intentionally left unmapped rather than guessed, since CIS section numbering differs across benchmark versions and the full PDF requires a CIS SecureSuite login.
-  - The DISA STIG mapping ships as an empty, ready-to-populate scaffold — the STIG package (NDM/L2S/RTR sub-STIGs, currently v3r5) was confirmed to exist, but no specific V-ID could be verified without DoD Cyber Exchange access. Same principle as the tool's `MANUAL_REVIEW` status elsewhere: don't fabricate a number that looks authoritative but might be wrong.
+  - The DISA STIG mapping shipped empty in this version — see v1.1.2 below for how it was populated afterward.
   - See `tools/generate_mappings.py` for the full reasoning behind every mapped (and deliberately unmapped) control — it's kept in-repo specifically so the mapping can be extended by editing that script rather than hand-writing JSON.
 - **No breaking changes.** `--compliance` is fully opt-in; running the tool without it produces byte-identical behavior to v1.0.
 
